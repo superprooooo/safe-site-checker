@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeSite – Is this website safe?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef3f1;--ink:#12241f;--mute:#5a6d67;--card:#fff;--line:#d5e0dc;--teal:#0f6b5c;
+--ok:#0f7a4a;--okbg:#e3f5ec;--warn:#9a5b00;--warnbg:#fff1d6;--bad:#b3261e;--badbg:#fde7e5}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1714;--ink:#e6f0ed;--mute:#93a8a1;--card:#15221e;--line:#25382f;--teal:#3fc4a8;
+--ok:#5fe0a0;--okbg:#12301f;--warn:#f5b955;--warnbg:#33260c;--bad:#ff8f86;--badbg:#3a1613}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Figtree,system-ui,sans-serif}
+main{max-width:640px;margin:0 auto;padding:56px 20px}
+h1{font:700 clamp(2rem,6vw,2.8rem)/1.1 "Bricolage Grotesque",sans-serif;margin:0 0 10px;letter-spacing:-.02em}
+.sub{color:var(--mute);margin:0 0 28px}
+form{display:flex;gap:8px}
+input{flex:1;min-width:0;padding:16px 18px;font:inherit;border:2px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+input:focus,button:focus-visible{outline:3px solid var(--teal);outline-offset:1px}
+button{padding:0 26px;font:600 1rem Figtree,sans-serif;border:0;border-radius:12px;background:var(--teal);color:#fff;cursor:pointer}
+@media (prefers-color-scheme:dark){button{color:#06231c}}
+button:disabled{opacity:.6;cursor:wait}
+#out{margin-top:28px}
+.banner{border-radius:16px;padding:22px 24px;margin-bottom:16px}
+.banner h2{font:700 1.5rem "Bricolage Grotesque",sans-serif;margin:0 0 4px}
+.banner p{margin:0}
+.safe{background:var(--okbg);color:var(--ok)}.suspicious{background:var(--warnbg);color:var(--warn)}.dangerous{background:var(--badbg);color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px 20px;margin-bottom:16px}
+.row{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}.row small{display:block;color:var(--mute)}
+.tag{font-weight:600;white-space:nowrap}.clean{color:var(--ok)}.flagged{color:var(--bad)}.skipped,.error{color:var(--mute)}
+ul{margin:8px 0;padding-left:20px}
+.note{color:var(--mute);font-size:.9rem}
+.err{color:var(--bad);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <h1>Is this website safe?</h1>
+  <p class="sub">Paste a web address. We check it against malware and phishing databases before you visit.</p>
+  <form id="f">
+    <input id="u" placeholder="example.com" autocomplete="off" autofocus aria-label="Website address">
+    <button id="b">Check</button>
+  </form>
+  <div id="out" aria-live="polite"></div>
+  <p class="note" style="margin-top:40px">Threat data from Google Safe Browsing, URLhaus (abuse.ch) and OpenPhish. Advisory provided by Google.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const HEAD = {
+  safe: ["Looks safe", "No threats found in the databases we checked."],
+  suspicious: ["Be careful", "No database lists this site, but its address has warning signs."],
+  dangerous: ["Dangerous – do not visit", "This site is listed as a threat. Don't enter passwords or download anything."]
+};
+$("f").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("b").disabled = true; $("b").textContent = "Checking…";
+  $("out").innerHTML = "";
+  try {
+    const r = await fetch("/api/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({url:$("u").value})});
+    const d = await r.json();
+    if (!r.ok) { $("out").innerHTML = `<p class="err">${esc(d.error)}</p>`; return; }
+    const [t, m] = HEAD[d.verdict];
+    $("out").innerHTML =
+      `<div class="banner ${d.verdict}"><h2>${t}</h2><p>${m}</p></div>
+       <div class="card">${d.checks.map(c => `<div class="row"><div>${esc(c.name)}<small>${esc(c.detail)}</small></div><span class="tag ${c.status}">${c.status}</span></div>`).join("")}</div>` +
+      (d.reasons.length ? `<div class="card"><div class="row"><div><b>Warning signs in the address</b><ul>${d.reasons.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div></div></div>` : "") +
+      `<p class="note">${d.checked} database(s) checked. "Safe" is never a guarantee, so stay careful with logins and payments.</p>`;
+  } catch { $("out").innerHTML = `<p class="err">Can't reach the checker. Make sure the app is still running.</p>`; }
+  finally { $("b").disabled = false; $("b").textContent = "Check"; }
+});
+</script>
+</body>
+</html>
